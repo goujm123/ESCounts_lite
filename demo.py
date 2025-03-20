@@ -17,6 +17,7 @@ import gdown
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE encoding', add_help=False)
+    parser.add_argument('--use_v1', default=False, help='use the v1 variant of the encoder')
     parser.add_argument('--config', default='configs/pretrain_config.yaml', help="config file")
 
     parser.add_argument('--video_name', default='data/train952.mp4', type=str,help='Demo video to infer on')
@@ -155,12 +156,12 @@ def main():
     decoder = decoder.to(args.resource)
     
     print('---- loading pretrained model ----')
-    output = 'repcount_trained.pyth'
-    if not os.path.isfile(output):
-        print("pretrained model NOT found: ", output)
+    pretrained_repcount = 'repcount_trained.pth'
+    if not os.path.isfile(pretrained_repcount):
+        print("pretrained model NOT found: ", pretrained_repcount)
         exit(-1)
 
-    decoder.load_state_dict(torch.load(output, map_location=args.resource)['model_state_dict'])
+    decoder.load_state_dict(torch.load(pretrained_repcount, map_location=args.resource)['model_state_dict'])
 
     ##placeholder exemplar
     tokens = tokens.unsqueeze(0)
