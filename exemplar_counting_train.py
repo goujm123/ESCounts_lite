@@ -21,6 +21,7 @@ torch.manual_seed(0)
 
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2 ** 32
+    # worker_seed = 0
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
@@ -56,28 +57,19 @@ def get_args_parser():
     parser.add_argument('--save_path', default='./saved_models_repcountfull', type=str, help="Path to save the model")
 
     # Optimizer parameters
-    parser.add_argument('--weight_decay', type=float, default=0,
-                        help='weight decay (default: 0.05)')
-    parser.add_argument('--lr', type=float, default=5e-6, metavar='LR',
-                        help='learning rate (peaklr)')
+    parser.add_argument('--weight_decay', type=float, default=0, help='weight decay (default: 0.05)')
+    parser.add_argument('--lr', type=float, default=5e-6, metavar='LR', help='learning rate (peaklr)')
     parser.add_argument('--eval_freq', default=2, type=int)
 
     # Dataset parameters
-    parser.add_argument('--precomputed', default=True, type=lambda x: (str(x).lower() == 'true'),
-                        help='flag to specify if precomputed tokens will be loaded')
-    parser.add_argument('--data_path', default='', type=str,
-                        help='dataset path')
-    parser.add_argument('--slurm_job_id', default=None, type=str,
-                        help='job id')
-    parser.add_argument('--tokens_dir', default='D:/datasets/ESCount/saved_VideoMAEtokens_RepCount', type=str,
-                        help='ground truth density map directory')
-    parser.add_argument('--exemplar_dir', default='D:/datasets/ESCount/exemplar_VideoMAEtokens_RepCount', type=str,
-                        help='ground truth density map directory')
-    parser.add_argument('--threshold', default=0.0, type=float,
-                        help='p, cut off to decide if select exemplar from different video')
+    parser.add_argument('--precomputed', default=True, type=lambda x: (str(x).lower() == 'true'), help='flag to specify if precomputed tokens will be loaded')
+    parser.add_argument('--data_path', default='', type=str, help='dataset path')
+    parser.add_argument('--slurm_job_id', default=None, type=str, help='job id')
+    parser.add_argument('--tokens_dir', default='D:/datasets/ESCount/saved_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--exemplar_dir', default='D:/datasets/ESCount/exemplar_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--threshold', default=0.0, type=float, help='p, cut off to decide if select exemplar from different video')
 
-    parser.add_argument('--device', default='cuda',
-                        help='device to use for training / testing')
+    parser.add_argument('--device', default='cuda', help='device to use for training / testing')
 
     # Training parameters
     parser.add_argument('--seed', default=0, type=int)
@@ -85,8 +77,7 @@ def get_args_parser():
     parser.add_argument('--pretrained_encoder', default='pretrained_models/VIT_B_16x4_MAE_PT.pth', type=str)
 
     parser.add_argument('--num_workers', default=2, type=int)
-    parser.add_argument('--pin_mem', action='store_true',
-                        help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
+    parser.add_argument('--pin_mem', action='store_true', help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
 
@@ -97,7 +88,7 @@ def get_args_parser():
     parser.add_argument('--log_dir', default='./logs/fim6_dir',
                         help='path where to tensorboard log')
     parser.add_argument("--title", default="", type=str)
-    parser.add_argument("--use_wandb", default=False, type=lambda x: (str(x).lower() == 'true'))
+    parser.add_argument("--use_wandb", default=True, type=lambda x: (str(x).lower() == 'true'))
     parser.add_argument("--wandb", default="", type=str)
     parser.add_argument("--team", default="", type=str)
     parser.add_argument("--wandb_id", default='', type=str)

@@ -121,3 +121,4 @@ tmp/*
 *.pyth
 
 pretrained_models/*
+wandb/*

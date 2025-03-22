@@ -52,8 +52,6 @@ class Rep_count(torch.utils.data.Dataset):
         # if self.split == 'train':
         self.df = self.df[self.df['count'].notna()]
         self.df = self.df[self.df['num_frames'] > 64]
-        # 内存装不下，放弃总帧数过多的文件
-        self.df = self.df[self.df['num_frames'] < 1200]
         self.df = self.df.drop(self.df.loc[self.df['name']=='stu1_10.mp4'].index)
         self.df = self.df.drop(self.df.loc[self.df['name']=='stu4_3.mp4'].index)
         self.df = self.df[self.df['count'] > 0] # remove no reps

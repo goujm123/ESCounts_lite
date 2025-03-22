@@ -62,7 +62,7 @@ class Rep_count(torch.utils.data.Dataset):
         self.df = self.df[self.df['num_frames'] > 64]
 
         # 内存装不下，放弃总帧数过多的文件
-        self.df = self.df[self.df['num_frames'] < 1200]
+        # self.df = self.df[self.df['num_frames'] < 1200]
 
         self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu1_10.mp4'].index)
         self.df = self.df[self.df['count'] > 0]  # remove no reps
@@ -127,10 +127,27 @@ class Rep_count(torch.utils.data.Dataset):
         ends = clc[1::2]
 
         frame_idx = self.get_vid_clips(duration - 1)  ### get frame indices
-        vid, num_frames = read_video_timestamps(video_name, frame_idx, duration=duration - 1)  ## return frames at the passed indices
+
+        try:
+            assert os.path.isfile(video_name), f"VideoLoader: {video_name} does not exist"
+        except:
+            print(f"{video_name} does not exist")
+            return None, None, None, video_name
+
+        try:
+            vr = VideoReader(video_name, ctx=cpu(0))
+            total_frames = len(vr)
+            frame = vr.get_batch([0])
+            del vr
+        except:
+            print("open file failed:", video_name)
+            return (0, 0, 0, 0), None, None, video_name
+        
+        _, H, W, c = frame.asnumpy().shape
+        shape = (c, total_frames, H, W)
+        
         vdur = (frame_idx[-1] - frame_idx[0]) / row['fps']
-        vid = self.transform(vid / 255.)
-        return vid, starts, ends, self.df.iloc[index]['name'][:-4]
+        return shape, starts, ends, video_name
 
     def __len__(self):
         return len(self.df)
