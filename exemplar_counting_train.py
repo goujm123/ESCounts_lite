@@ -57,17 +57,17 @@ def get_args_parser():
     parser.add_argument('--save_path', default='./saved_models_repcountfull', type=str, help="Path to save the model")
 
     # Optimizer parameters
-    parser.add_argument('--weight_decay', type=float, default=0, help='weight decay (default: 0.05)')
-    parser.add_argument('--lr', type=float, default=5e-6, metavar='LR', help='learning rate (peaklr)')
+    parser.add_argument('--weight_decay', type=float, default=0.05, help='weight decay (default: 0.05)')
+    parser.add_argument('--lr', type=float, default=5e-5, metavar='LR', help='learning rate (peaklr)')
     parser.add_argument('--eval_freq', default=2, type=int)
 
     # Dataset parameters
     parser.add_argument('--precomputed', default=True, type=lambda x: (str(x).lower() == 'true'), help='flag to specify if precomputed tokens will be loaded')
     parser.add_argument('--data_path', default='', type=str, help='dataset path')
     parser.add_argument('--slurm_job_id', default=None, type=str, help='job id')
-    parser.add_argument('--tokens_dir', default='D:/datasets/ESCount/saved_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
-    parser.add_argument('--exemplar_dir', default='D:/datasets/ESCount/exemplar_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
-    parser.add_argument('--threshold', default=0.0, type=float, help='p, cut off to decide if select exemplar from different video')
+    parser.add_argument('--tokens_dir', default='./saved_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--exemplar_dir', default='./exemplar_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--threshold', default=0.4, type=float, help='p, cut off to decide if select exemplar from different video')
 
     parser.add_argument('--device', default='cuda', help='device to use for training / testing')
 
@@ -262,6 +262,8 @@ def main():
             config=args,
             resume="allow",
             project=args.wandb,
+            mode="offline",
+            anonymous="allow",
             entity=args.team,
             id=f"{args.wandb_id}_{args.dataset}_{args.encodings}_{args.lr}_{args.threshold}",
         )

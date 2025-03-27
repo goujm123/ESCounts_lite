@@ -22,11 +22,11 @@ def get_args_parser():
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
     parser.add_argument('--num_gpus', default=1, type=int)
     parser.add_argument('--pretrained_encoder', default='pretrained_models/VIT_B_16x4_MAE_PT.pth', type=str)
-    parser.add_argument('--save_exemplar_encodings', default=True, type=bool)
+    parser.add_argument('--save_exemplar_encodings', default=False, type=bool)
     parser.add_argument('--dataset', default='RepCount', help='choose from [RepCount, Countix, UCFRep]', type=str)
     parser.add_argument('--model', default='VideoMAE', help="VideoMAE, VideoSwin")
     parser.add_argument('--encodings', default='mae', help="mae, swin, resnext")
-    parser.add_argument('--data_path', default='D:/datasets/RepCount/video', help='data path for the dataset')
+    parser.add_argument('--data_path', default='../RepCount/video', help='data path for the dataset')
     return parser
 
 
@@ -85,7 +85,7 @@ def save_exemplar(dataloaders, model, args):
     num_frames = 16
     splits = ['train', 'val', 'test']
 
-    target_dir = f'd:/datasets/ESCount/exemplar_{args.model}tokens_new_{args.dataset}'
+    target_dir = f'./exemplar_{args.model}tokens_{args.dataset}'
     if not os.path.isdir(target_dir):
         os.makedirs(target_dir)
 
@@ -169,7 +169,7 @@ def save_tokens(dataloaders, model, args):
     num_frames = 16
     splits = ['train', 'val', 'test']
 
-    target_dir = f'd:/datasets/ESCount/saved_{args.model}tokens_new_{args.dataset}'
+    target_dir = f'./saved_{args.model}tokens_{args.dataset}'
     if not os.path.isdir(target_dir):
         print('Creating folder')
         os.makedirs(target_dir)
@@ -265,6 +265,7 @@ def main():
 
     # model = nn.parallel.DataParallel(model, device_ids=[i for i in range(args.num_gpus)])
 
+    '''
     for name in model.state_dict().keys():
         if 'decoder' in name or 'decode_heads' in name:
             continue
@@ -282,8 +283,39 @@ def main():
                 model.state_dict()[name].copy_(param)
                 matched = 1
                 break
-        if matched == 0 and '.qkv.' in name:
-            if not args.use_v1:
+            elif matched == 0 and '.qkv.' in name:
+                if not args.use_v1:
+                    q_name = name.replace('.qkv.', '.q.').replace('module.', '')
+                    k_name = name.replace('.qkv.', '.k.').replace('module.', '')
+                    v_name = name.replace('.qkv.', '.v.').replace('module.', '')
+                    params = torch.cat([state_dict[q_name], state_dict[k_name], state_dict[v_name]])
+                    model.state_dict()[name].copy_(params)
+                    matched = 1
+                    break
+                else:
+                    if '.qkv.bias' in name:
+                        q_name = name.replace('.qkv.', '.q_').replace('module.', 'encoder.')
+                        v_name = name.replace('.qkv.', '.v_').replace('module.', 'encoder.')
+                        params = torch.cat([state_dict[q_name], torch.zeros_like(state_dict[v_name], requires_grad=False), state_dict[v_name]])
+                        model.state_dict()[name].copy_(params)
+                        matched = 1
+                        break
+        
+        # if matched == 0:
+        #     print(f"parameters {name} not found"
+        '''
+
+    for name in model.state_dict().keys():
+        if 'decode' in name:
+            continue
+        matched = 0
+
+        for name_, param in state_dict.items():
+            if name_ == name:
+                model.state_dict()[name].copy_(param)
+                matched = 1
+                break
+            elif '.qkv.' in name and 'blocks' in name:
                 q_name = name.replace('.qkv.', '.q.').replace('module.', '')
                 k_name = name.replace('.qkv.', '.k.').replace('module.', '')
                 v_name = name.replace('.qkv.', '.v.').replace('module.', '')
@@ -291,16 +323,6 @@ def main():
                 model.state_dict()[name].copy_(params)
                 matched = 1
                 break
-            else:
-                if '.qkv.bias' in name:
-                    q_name = name.replace('.qkv.', '.q_').replace('module.', 'encoder.')
-                    v_name = name.replace('.qkv.', '.v_').replace('module.', 'encoder.')
-                    params = torch.cat([state_dict[q_name], torch.zeros_like(state_dict[v_name], requires_grad=False), state_dict[v_name]])
-                    model.state_dict()[name].copy_(params)
-                    matched = 1
-                    break
-        if matched == 0:
-            print(f"parameters {name} not found")
 
     model.eval()
     if args.dataset == 'RepCount':

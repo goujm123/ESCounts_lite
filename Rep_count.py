@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from decord import VideoReader, cpu, gpu
-from pytorchvideo.transforms import create_video_transform
+# from pytorchvideo.transforms import create_video_transform
 from itertools import cycle, islice
 import torch.multiprocessing
 
@@ -61,10 +61,9 @@ class Rep_count(torch.utils.data.Dataset):
         self.df = self.df[self.df['count'].notna()]
         self.df = self.df[self.df['num_frames'] > 64]
 
-        # 内存装不下，放弃总帧数过多的文件
-        # self.df = self.df[self.df['num_frames'] < 1200]
-
         self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu1_10.mp4'].index)
+        self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu4_3.mp4'].index)
+        self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu4_5.mp4'].index)
         self.df = self.df[self.df['count'] > 0]  # remove no reps
         print(f"--- Loaded: {len(self.df)} videos for {self.split} --- ")
 
@@ -73,13 +72,13 @@ class Rep_count(torch.utils.data.Dataset):
         else:
             self.num_frames = 16
 
-        self.transform = create_video_transform(mode="test",
-                                                convert_to_float=False,
-                                                min_size=224,
-                                                crop_size=224,
-                                                num_samples=None,
-                                                video_mean=[0.485, 0.456, 0.406],
-                                                video_std=[0.229, 0.224, 0.225])
+        # self.transform = create_video_transform(mode="test",
+        #                                         convert_to_float=False,
+        #                                         min_size=224,
+        #                                         crop_size=224,
+        #                                         num_samples=None,
+        #                                         video_mean=[0.485, 0.456, 0.406],
+        #                                         video_std=[0.229, 0.224, 0.225])
 
     def get_vid_clips(self, vid_length):
 
@@ -132,7 +131,7 @@ class Rep_count(torch.utils.data.Dataset):
             assert os.path.isfile(video_name), f"VideoLoader: {video_name} does not exist"
         except:
             print(f"{video_name} does not exist")
-            return None, None, None, video_name
+            return (0, 0, 0, 0), None, None, video_name
 
         try:
             vr = VideoReader(video_name, ctx=cpu(0))
@@ -157,7 +156,7 @@ class Rep_count(torch.utils.data.Dataset):
 if __name__ == '__main__':
     from tqdm import tqdm
 
-    dat = Rep_count(data_dir="D:/datasets/RepCount/video")
+    dat = Rep_count(data_dir="../RepCount/video")
     print('dataset created')
 
     dataloader = torch.utils.data.DataLoader(dat, batch_size=1, num_workers=1, shuffle=False, pin_memory=False, drop_last=True)
