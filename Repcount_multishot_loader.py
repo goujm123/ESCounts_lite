@@ -19,8 +19,11 @@ class Rep_count(torch.utils.data.Dataset):
                  split="train",
                  add_noise= False,
                  num_frames=512,
-                 tokens_dir = "./saved_VideoMAEtokens_RepCount",
-                 exemplar_dir = "./exemplar_VideoMAEtokens_RepCount",
+                 tokens_dir = "D:/datasets/ESCount/saved_VideoMAE_tokens_RepCount",
+                 
+                 # TODO: 修改exemplar
+                 exemplar_dir = "D:/datasets/ESCount/exemplar_VideoMAE_tokens_RepCount",
+                 
                  select_rand_segment=True,
                  compact=False,
                  lim_constraint=np.inf,
@@ -34,7 +37,10 @@ class Rep_count(torch.utils.data.Dataset):
         self.num_frames=num_frames
         self.lim_constraint = lim_constraint
         self.tokens_dir = tokens_dir
+        
+        # TODO: 修改exemplar
         self.exemplar_dir = exemplar_dir
+        
         self.compact = compact
         self.select_rand_segment = select_rand_segment
         self.pool_tokens = pool_tokens_factor

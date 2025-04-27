@@ -15,6 +15,7 @@ import wandb
 import torch.optim as optim
 import math
 import random
+import time
 
 torch.manual_seed(0)
 
@@ -31,14 +32,12 @@ def get_args_parser():
     parser.add_argument('--config', default='configs/pretrain_config.yaml', type=str)
     parser.add_argument('--batch_size', default=1, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
-    parser.add_argument('--epochs', default=300, type=int)
+    parser.add_argument('--epochs', default=60, type=int)
     parser.add_argument('--encodings', default='mae', type=str, help=['swin', 'mae'])
     parser.add_argument('--accum_iter', default=1, type=int,
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
-    parser.add_argument('--only_test', default=False,
-                        help='Only testing')
-    parser.add_argument('--trained_model', default='', type=str,
-                        help='path to a trained model')
+    parser.add_argument('--only_test', default=False, help='Only testing')
+    parser.add_argument('--trained_model', default='./saved_models_repcount/best_1.pyth', type=str, help='path to a trained model')
     parser.add_argument('--scale_counts', default=100, type=int, help='scaling the counts')
 
     parser.add_argument('--dataset', default='RepCount', type=str, help='Repcount, Countix, UCFRep')
@@ -47,9 +46,9 @@ def get_args_parser():
 
     parser.add_argument('--peak_at_random_locations', default=False, type=bool, help='whether to have density peaks at random locations')
 
-    parser.add_argument('--multishot', action='store_true')
+    parser.add_argument('--multishot', default=True, action='store_true')
 
-    parser.add_argument('--iterative_shots', action='store_true', help='will show the examples one by one')
+    parser.add_argument('--iterative_shots', default=True, action='store_true', help='will show the examples one by one')
 
     parser.add_argument('--density_peak_width', default=0.5, type=float, help='sigma for the peak of density maps, lesser sigma gives sharp peaks')
 
@@ -65,8 +64,8 @@ def get_args_parser():
     parser.add_argument('--precomputed', default=True, type=lambda x: (str(x).lower() == 'true'), help='flag to specify if precomputed tokens will be loaded')
     parser.add_argument('--data_path', default='', type=str, help='dataset path')
     parser.add_argument('--slurm_job_id', default=None, type=str, help='job id')
-    parser.add_argument('--tokens_dir', default='./saved_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
-    parser.add_argument('--exemplar_dir', default='./exemplar_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--tokens_dir', default='D:/datasets/ESCount_4090/saved_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
+    parser.add_argument('--exemplar_dir', default='D:/datasets/ESCount_4090/exemplar_VideoMAEtokens_RepCount', type=str, help='ground truth density map directory')
     parser.add_argument('--threshold', default=0.4, type=float, help='p, cut off to decide if select exemplar from different video')
 
     parser.add_argument('--device', default='cuda', help='device to use for training / testing')
@@ -76,7 +75,7 @@ def get_args_parser():
 
     parser.add_argument('--pretrained_encoder', default='pretrained_models/VIT_B_16x4_MAE_PT.pth', type=str)
 
-    parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--num_workers', default=1, type=int)
     parser.add_argument('--pin_mem', action='store_true', help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
     parser.set_defaults(pin_mem=True)
@@ -85,10 +84,9 @@ def get_args_parser():
     parser.add_argument('--num_gpus', default=1, type=int, help='number of gpus')
 
     # Logging parameters
-    parser.add_argument('--log_dir', default='./logs/fim6_dir',
-                        help='path where to tensorboard log')
+    parser.add_argument('--log_dir', default='./logs/fim6_dir', help='path where to tensorboard log')
     parser.add_argument("--title", default="", type=str)
-    parser.add_argument("--use_wandb", default=True, type=lambda x: (str(x).lower() == 'true'))
+    parser.add_argument("--use_wandb", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add_argument("--wandb", default="", type=str)
     parser.add_argument("--team", default="", type=str)
     parser.add_argument("--wandb_id", default='', type=str)
@@ -114,76 +112,74 @@ def main():
     '''
     create dataloaders
     '''
-    if args.precomputed:
-        if args.dataset == 'RepCount':
-            dataset_train = Rep_count(split="train",
-                                      tokens_dir=args.tokens_dir,
-                                      exemplar_dir=args.exemplar_dir,
-                                      select_rand_segment=False,
-                                      compact=True,
-                                      pool_tokens_factor=args.token_pool_ratio,
-                                      peak_at_random_location=args.peak_at_random_locations,
-                                      get_overlapping_segments=args.get_overlapping_segments,
-                                      multishot=args.multishot,
-                                      threshold=args.threshold)
+    dataset_train = Rep_count(split="train",
+                              tokens_dir=args.tokens_dir,
+                              exemplar_dir=args.exemplar_dir,
+                              select_rand_segment=False,
+                              compact=True,
+                              pool_tokens_factor=args.token_pool_ratio,
+                              peak_at_random_location=args.peak_at_random_locations,
+                              get_overlapping_segments=args.get_overlapping_segments,
+                              multishot=args.multishot,
+                              threshold=args.threshold)
 
-            dataset_valid = Rep_count(split="valid",
-                                      tokens_dir=args.tokens_dir,
-                                      exemplar_dir=args.exemplar_dir,
-                                      select_rand_segment=False,
-                                      compact=True,
-                                      pool_tokens_factor=args.token_pool_ratio,
-                                      peak_at_random_location=args.peak_at_random_locations,
-                                      get_overlapping_segments=args.get_overlapping_segments,
-                                      multishot=args.multishot,
-                                      density_peak_width=args.density_peak_width)
-            dataset_test = Rep_count(split="test",
-                                     tokens_dir=args.tokens_dir,
-                                     exemplar_dir=args.exemplar_dir,
-                                     select_rand_segment=False,
-                                     compact=True,
-                                     pool_tokens_factor=args.token_pool_ratio,
-                                     peak_at_random_location=args.peak_at_random_locations,
-                                     get_overlapping_segments=args.get_overlapping_segments,
-                                     multishot=args.multishot,
-                                     density_peak_width=args.density_peak_width)
-            
-        # Create dict of dataloaders for train and val
-        dataloaders = {'train': torch.utils.data.DataLoader(dataset_train,
-                                                            batch_size=args.batch_size,
-                                                            num_workers=args.num_workers,
-                                                            shuffle=True,
-                                                            pin_memory=False,
-                                                            drop_last=False,
-                                                            collate_fn=dataset_train.collate_fn,
-                                                            worker_init_fn=seed_worker,
-                                                            persistent_workers=True,
-                                                            generator=g),
-                       'val': torch.utils.data.DataLoader(dataset_valid,
-                                                          batch_size=args.batch_size,
-                                                          num_workers=args.num_workers,
-                                                          shuffle=False,
-                                                          pin_memory=False,
-                                                          drop_last=False,
-                                                          collate_fn=dataset_valid.collate_fn,
-                                                          worker_init_fn=seed_worker,
-                                                          generator=g),
-                       'test': torch.utils.data.DataLoader(dataset_test,
-                                                           batch_size=1,
-                                                           num_workers=args.num_workers,
-                                                           shuffle=False,
-                                                           pin_memory=False,
-                                                           drop_last=False,
-                                                           collate_fn=dataset_valid.collate_fn,
-                                                           worker_init_fn=seed_worker,
-                                                           generator=g)}
+    dataset_valid = Rep_count(split="valid",
+                              tokens_dir=args.tokens_dir,
+                              exemplar_dir=args.exemplar_dir,
+                              select_rand_segment=False,
+                              compact=True,
+                              pool_tokens_factor=args.token_pool_ratio,
+                              peak_at_random_location=args.peak_at_random_locations,
+                              get_overlapping_segments=args.get_overlapping_segments,
+                              multishot=args.multishot,
+                              density_peak_width=args.density_peak_width)
+    
+    dataset_test = Rep_count(split="test",
+                             tokens_dir=args.tokens_dir,
+                             exemplar_dir=args.exemplar_dir,
+                             select_rand_segment=False,
+                             compact=True,
+                             pool_tokens_factor=args.token_pool_ratio,
+                             peak_at_random_location=args.peak_at_random_locations,
+                             get_overlapping_segments=args.get_overlapping_segments,
+                             multishot=args.multishot,
+                             density_peak_width=args.density_peak_width)
+
+    # Create dict of dataloaders for train and val
+    dataloaders = {'train': torch.utils.data.DataLoader(dataset_train,
+                                                        batch_size=args.batch_size,
+                                                        num_workers=args.num_workers,
+                                                        shuffle=True,
+                                                        pin_memory=False,
+                                                        drop_last=False,
+                                                        collate_fn=dataset_train.collate_fn,
+                                                        worker_init_fn=seed_worker,
+                                                        persistent_workers=True,
+                                                        generator=g),
+                   'val': torch.utils.data.DataLoader(dataset_valid,
+                                                      batch_size=args.batch_size,
+                                                      num_workers=args.num_workers,
+                                                      shuffle=False,
+                                                      pin_memory=False,
+                                                      drop_last=False,
+                                                      collate_fn=dataset_valid.collate_fn,
+                                                      worker_init_fn=seed_worker,
+                                                      generator=g),
+                   'test': torch.utils.data.DataLoader(dataset_test,
+                                                       batch_size=1,
+                                                       num_workers=args.num_workers,
+                                                       shuffle=False,
+                                                       pin_memory=False,
+                                                       drop_last=False,
+                                                       collate_fn=dataset_valid.collate_fn,
+                                                       worker_init_fn=seed_worker,
+                                                       generator=g)}
 
     # scaler = torch.cuda.amp.GradScaler() # use mixed percision for efficiency
     # scaler = NativeScaler()
-    model = SupervisedMAE(cfg=cfg, use_precomputed=args.precomputed, token_pool_ratio=args.token_pool_ratio, iterative_shots=args.iterative_shots, encodings=args.encodings,
-                          window_size=args.window_size).cuda()
-    # else:
-    #     model = SupervisedMAE(cfg=cfg,use_precomputed=args.precomputed, token_pool_ratio=args.token_pool_ratio, iterative_shots=args.iterative_shots, encodings=args.encodings, no_exemplars=args.no_exemplars).cuda()
+    model = SupervisedMAE(cfg=cfg, use_precomputed=args.precomputed, token_pool_ratio=args.token_pool_ratio, iterative_shots=args.iterative_shots,
+                          encodings=args.encodings, window_size=args.window_size).cuda()
+
     if args.num_gpus > 1:
         model = nn.parallel.DataParallel(model, device_ids=[i for i in range(args.num_gpus)])
 
@@ -262,11 +258,12 @@ def main():
             config=args,
             resume="allow",
             project=args.wandb,
-            mode="offline",
             anonymous="allow",
+            mode="offline",
             entity=args.team,
             id=f"{args.wandb_id}_{args.dataset}_{args.encodings}_{args.lr}_{args.threshold}",
         )
+
     param_groups = optim_factory.add_weight_decay(model, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     milestones = [i for i in range(0, args.epochs, 60)]
@@ -276,9 +273,11 @@ def main():
     best_loss = np.inf
 
     os.makedirs(args.save_path, exist_ok=True)
+
     for epoch in range(args.epochs):
         torch.cuda.empty_cache()
         scheduler.step()
+        start_time = time.time()
 
         print(f"Epoch: {epoch:02d}")
         for phase in ['train', 'val']:
@@ -304,6 +303,7 @@ def main():
 
                 bformat = '{l_bar}{bar}| {n_fmt}/{total_fmt} {rate_fmt}{postfix}'
                 dataloader = dataloaders[phase]
+
                 with tqdm(total=len(dataloader), bar_format=bformat, ascii='░▒█') as pbar:
                     for i, item in enumerate(dataloader):
                         if phase == 'train':
@@ -319,6 +319,7 @@ def main():
                             shot_num = item[6][0]  ## number of shots
                             b, n, c = data.shape
                             y = model(data, example, thw, shot_num=shot_num)
+
                             if phase == 'train':
                                 mask = np.random.binomial(n=1, p=0.8, size=[1, density_map.shape[1]])  ### random masking of 20% density map
                             else:
@@ -332,6 +333,7 @@ def main():
 
                             predict_count = torch.sum(y, dim=1).type(torch.cuda.FloatTensor) / args.scale_counts  # sum density map
                             # loss_mse = torch.mean((predict_count - actual_counts)**2)
+
                             if phase == 'val':
                                 ground_truth.append(actual_counts.detach().cpu().numpy())
                                 predictions.append(predict_count.detach().cpu().numpy())
@@ -339,6 +341,7 @@ def main():
                             loss2 = lossSL1(predict_count, actual_counts)  ###L1 loss between count and predicted count
                             loss3 = torch.sum(torch.div(torch.abs(predict_count - actual_counts), actual_counts + 1e-1)) / \
                                     predict_count.flatten().shape[0]  #### reduce the mean absolute error (mae loss)
+
                             if phase == 'train':
 
                                 loss1 = (loss + 1.0 * loss3) / args.accum_iter  ### mse between density maps + mae loss (loss3)
@@ -404,6 +407,10 @@ def main():
                             'model_state_dict': model.state_dict(),
                             'optimizer_state_dict': optimizer.state_dict(),
                         }, os.path.join(args.save_path, 'epoch_{}.pyth'.format(str(epoch).zfill(3))))
+
+        used_time = time.time() - start_time
+
+        print(f"Time elapsed: {int(used_time)} sec")
 
     if args.use_wandb:
         wandb_run.finish()
