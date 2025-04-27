@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from decord import VideoReader, cpu, gpu
-from pytorchvideo.transforms import create_video_transform
+# from pytorchvideo.transforms import create_video_transform
 from itertools import cycle, islice
 import torch.multiprocessing
 
@@ -61,10 +61,9 @@ class Rep_count(torch.utils.data.Dataset):
         self.df = self.df[self.df['count'].notna()]
         self.df = self.df[self.df['num_frames'] > 64]
 
-        # 测试，只使用指定的这个文件，去掉其余的文件
-        # self.df = self.df.drop(self.df.loc[self.df['name'] != 'stu1_1.mp4'].index)
-
         self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu1_10.mp4'].index)
+        self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu4_3.mp4'].index)
+        self.df = self.df.drop(self.df.loc[self.df['name'] == 'stu4_5.mp4'].index)
         self.df = self.df[self.df['count'] > 0]  # remove no reps
         print(f"--- Loaded: {len(self.df)} videos for {self.split} --- ")
 
@@ -72,6 +71,14 @@ class Rep_count(torch.utils.data.Dataset):
             self.num_frames = cfg.DATA.NUM_FRAMES
         else:
             self.num_frames = 16
+
+        # self.transform = create_video_transform(mode="test",
+        #                                         convert_to_float=False,
+        #                                         min_size=224,
+        #                                         crop_size=224,
+        #                                         num_samples=None,
+        #                                         video_mean=[0.485, 0.456, 0.406],
+        #                                         video_std=[0.229, 0.224, 0.225])
 
     def get_vid_clips(self, vid_length):
 
@@ -134,10 +141,10 @@ class Rep_count(torch.utils.data.Dataset):
         except:
             print("open file failed:", video_name)
             return (0, 0, 0, 0), None, None, video_name
-
+        
         _, H, W, c = frame.asnumpy().shape
         shape = (c, total_frames, H, W)
-
+        
         vdur = (frame_idx[-1] - frame_idx[0]) / row['fps']
         return shape, starts, ends, video_name
 
@@ -149,7 +156,7 @@ class Rep_count(torch.utils.data.Dataset):
 if __name__ == '__main__':
     from tqdm import tqdm
 
-    dat = Rep_count(data_dir="D:/datasets/RepCount/video")
+    dat = Rep_count(data_dir="../RepCount/video")
     print('dataset created')
 
     dataloader = torch.utils.data.DataLoader(dat, batch_size=1, num_workers=1, shuffle=False, pin_memory=False, drop_last=True)
@@ -167,5 +174,12 @@ if __name__ == '__main__':
         sum_clip_counts.append(item[2])
         sum_tot_counts.append(item[3])
 
+        # fps.append(item[4])
+
+        # print(i, item[1].shape)
+        # print(i, item[2].shape)
+        # print(item[2])
+
     print(f"Avg clip dur: {sum(sum_clip_dur) / len(sum_clip_dur)} | Avg vid dur: {sum(sum_tot_dur) / len(sum_tot_dur)}")
     print(f"Avg clip reps: {sum(sum_clip_counts) / len(sum_clip_counts)} | Avg vid counts: {sum(sum_tot_counts) / len(sum_tot_counts)}")
+    # print(sum(fps)/len(fps))

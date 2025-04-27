@@ -1,5 +1,4 @@
 TASK: ssl
-
 TRAIN:
   ENABLE: True
   DATASET: kinetics
@@ -8,7 +7,6 @@ TRAIN:
   CHECKPOINT_PERIOD: 5
   AUTO_RESUME: True
   KILL_LOSS_EXPLOSION_FACTOR: 2.0 # default 0.0 (not enforced)
-
 DATA:
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
@@ -22,7 +20,6 @@ DATA:
   TRAIN_JITTER_SCALES_RELATIVE: [0.5, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   TRAIN_CROP_NUM_TEMPORAL: 4  # default 1
-
 MVIT:
   ZERO_DECAY_POS_CLS: False
   SEP_POS_EMBED: True # default: False needs to be false for fixed sincos
@@ -38,7 +35,6 @@ MVIT:
   DROPPATH_RATE: 0.0
   MODE: "conv"
   CLS_EMBED_ON: True
-
 MASK:
   ENABLE: True
   MAE_ON: True #  default False
@@ -47,17 +43,14 @@ MASK:
   HEAD_TYPE: "separate_xformer"
   DECODER_DEPTH: 4
   DECODER_EMBED_DIM: 512
-
 AUG:
   ENABLE: True
   COLOR_JITTER: None
   AA_TYPE: ""
   RE_PROB: 0.0
   MASK_RATIO: 0.9
-
 MIXUP:
   ENABLE: False
-
 SOLVER:
   CLIP_GRAD_L2NORM: 0.02
   BASE_LR: 1e-4
@@ -73,23 +66,19 @@ SOLVER:
   ZERO_WD_1D_PARAM: True # default False
   WARMUP_START_LR: 1e-6
   OPTIMIZING_METHOD: adamw
-
 MODEL:
   ARCH: maskmvit
   MODEL_NAME: MaskMViT
   LOSS_FUNC: multi_mse
   DROPOUT_RATE: 0.0
-
 TEST:
   ENABLE: False
   DATASET: kinetics
   BATCH_SIZE: 64
   NUM_SPATIAL_CROPS: 1
-
 DATA_LOADER:
   NUM_WORKERS: 1
   PIN_MEMORY: True
-
 NUM_GPUS: 1
 NUM_SHARDS: 1
 RNG_SEED: 0

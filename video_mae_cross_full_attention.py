@@ -1,5 +1,5 @@
 from models.attention import MultiScaleBlock
-import math
+import math 
 
 import numpy as np
 import einops
@@ -14,8 +14,6 @@ from model_crossvit_window_attention import CrossAttentionBlock, WindowedSelfAtt
 
 from util.pos_embed import get_2d_sincos_pos_embed
 from timm.models.layers import trunc_normal_
-
-
 # from models_crossvit import Attention
 
 class PatchEmbed3D(nn.Module):
@@ -27,8 +25,7 @@ class PatchEmbed3D(nn.Module):
         embed_dim (int): Number of linear projection output channels. Default: 96.
         norm_layer (nn.Module, optional): Normalization layer. Default: None
     """
-
-    def __init__(self, patch_size=(2, 4, 4), in_chans=3, embed_dim=96, norm_layer=None):
+    def __init__(self, patch_size=(2,4,4), in_chans=3, embed_dim=96, norm_layer=None):
         super().__init__()
         self.patch_size = patch_size
 
@@ -77,23 +74,21 @@ def round_width(width, multiplier, min_width=1, divisor=1, verbose=False):
         width_out += divisor
     return int(width_out)
 
-
 class SupervisedMAE(nn.Module):
     def __init__(self, cfg=None, img_size=384, patch_size=16, in_chans=3,
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=2, decoder_num_heads=16,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, just_encode=False,
-                 use_precomputed=True, token_pool_ratio=1.0, iterative_shots=False, encodings='mae', no_exemplars=False, window_size=(3, 3, 3)):
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, just_encode=False, 
+                 use_precomputed=True, token_pool_ratio=1.0, iterative_shots=False, encodings='swin', no_exemplars=False, window_size=(3,3,3)):
 
         super().__init__()
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
-        # --------------------------------------------------------------------------
+
         embed_dim = cfg.MVIT.EMBED_DIM
         self.just_encode = just_encode
         self.use_precomputed = use_precomputed
-
         # Prepare backbone
         pool_first = cfg.MVIT.POOL_FIRST
         num_heads = cfg.MVIT.NUM_HEADS
@@ -110,7 +105,6 @@ class SupervisedMAE(nn.Module):
         mode = cfg.MVIT.MODE
         self.cls_embed_on = cfg.MVIT.CLS_EMBED_ON
         self.use_mean_pooling = cfg.MVIT.USE_MEAN_POOLING
-
         # Params for positional embedding
         self.use_abs_pos = cfg.MVIT.USE_ABS_POS
         self.use_fixed_sincos_pos = cfg.MVIT.USE_FIXED_SINCOS_POS
@@ -118,12 +112,10 @@ class SupervisedMAE(nn.Module):
         self.rel_pos_spatial = cfg.MVIT.REL_POS_SPATIAL
         self.rel_pos_temporal = cfg.MVIT.REL_POS_TEMPORAL
         dim_mul, head_mul = torch.ones(depth + 1), torch.ones(depth + 1)
-
         for i in range(len(cfg.MVIT.DIM_MUL)):
             dim_mul[cfg.MVIT.DIM_MUL[i][0]] = cfg.MVIT.DIM_MUL[i][1]
         for i in range(len(cfg.MVIT.HEAD_MUL)):
             head_mul[cfg.MVIT.HEAD_MUL[i][0]] = cfg.MVIT.HEAD_MUL[i][1]
-
         self.patch_stride = cfg.MVIT.PATCH_STRIDE
         if self.use_2d_patch:
             self.patch_stride = [1] + self.patch_stride
@@ -145,7 +137,9 @@ class SupervisedMAE(nn.Module):
         stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
 
         for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
-            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][1:]
+            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
+                1:
+            ]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
                 pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
@@ -166,9 +160,13 @@ class SupervisedMAE(nn.Module):
                 cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
 
         for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
-            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[i][1:]
+            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
+                i
+            ][1:]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
+                pool_kv[
+                    cfg.MVIT.POOL_KV_STRIDE[i][0]
+                ] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
                 pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
                     s + 1 if s > 1 else s
@@ -179,28 +177,34 @@ class SupervisedMAE(nn.Module):
         self.pool_kv = pool_kv
         self.stride_q = stride_q
         self.stride_kv = stride_kv
-        self.patch_dims = [self.input_dims[i] // self.patch_stride[i] for i in range(len(self.input_dims))]
+        self.patch_dims = [
+            self.input_dims[i] // self.patch_stride[i]
+            for i in range(len(self.input_dims))
+        ]
         self.num_patches = math.prod(self.patch_dims)
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
+        dpr = [
+            x.item() for x in torch.linspace(0, drop_path_rate, depth)
+        ]
         input_size = self.patch_dims
         self.T = cfg.DATA.NUM_FRAMES // self.patch_stride[0]
         self.H = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[1]
         self.W = cfg.DATA.TRAIN_CROP_SIZE // self.patch_stride[2]
 
+
         # self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim), requires_grad=False)  # fixed sin-cos embedding
 
-        # 使用 timm 中的 Transformer 模块构建（训练的时候use_precomputed为 True，不会走这个流程，可以忽略）
         if not self.use_precomputed:
             self.blocks = nn.ModuleList([
                 Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
-                for i in range(depth)])
-
+                for i in range(depth)]) 
+        
         if self.cls_embed_on:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
             pos_embed_dim = self.num_patches + 1
         else:
             pos_embed_dim = self.num_patches
 
+        
         if self.use_abs_pos:
             if self.sep_pos_embed:
                 self.pos_embed_spatial = nn.Parameter(
@@ -228,6 +232,9 @@ class SupervisedMAE(nn.Module):
                         requires_grad=not self.use_fixed_sincos_pos,
                     )
 
+
+ 
+        
         self.blocks = nn.ModuleList()
 
         for i in range(depth):
@@ -244,7 +251,6 @@ class SupervisedMAE(nn.Module):
                     dim_mul[i + 1],
                     divisor=round_width(num_heads, head_mul[i + 1]),
                 )
-
             attention_block = MultiScaleBlock(
                 dim=embed_dim,
                 dim_out=dim_out,
@@ -270,7 +276,6 @@ class SupervisedMAE(nn.Module):
                 separate_qkv=cfg.MVIT.SEPARATE_QKV,
             )
 
-            # 训练的时候 use_precomputed 为 True，不走这个流程，可以忽略
             if not self.use_precomputed:
                 self.blocks.append(attention_block)
                 if len(stride_q[i]) > 0:
@@ -283,47 +288,44 @@ class SupervisedMAE(nn.Module):
 
             self.norm = norm_layer(embed_dim)
 
+        
         self.norm = norm_layer(embed_dim)
-        embed_dim = 2048 if encodings == 'resnext' else 768
+        embed_dim = 2048 if encodings=='resnext' else 768
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
         # MAE decoder specifics
-        # --------------------------------------------------------------------------
         # print('Embed Dim', embed_dim)
         self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
         self.decoder_pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, decoder_embed_dim), requires_grad=False)  # fixed sin-cos embedding
-
         spatial_tokens = math.ceil(token_pool_ratio * 14) if encodings == 'mae' else math.ceil(token_pool_ratio * 7)
         self.decoder_spatial_pos_embed = nn.Parameter(torch.from_numpy(get_2d_sincos_pos_embed(decoder_embed_dim, spatial_tokens).astype(np.float32)), requires_grad=False)
         self.example_spatial_pos_embed = nn.Parameter(torch.from_numpy(get_2d_sincos_pos_embed(decoder_embed_dim, 14).astype(np.float32)), requires_grad=False)
-
         trunc_normal_(self.decoder_spatial_pos_embed, std=.02)
         self.shot_token = nn.Parameter(torch.zeros(1568, decoder_embed_dim))
 
-        # CrossAttentionBlocks
+ 
+        
         self.decoder_blocks = nn.ModuleList([
-            CrossAttentionBlock(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, drop_path=0,
-                                iterative_shots=self.iterative_shots, no_exemplars=no_exemplars)
-            for i in range(decoder_depth)])
+            CrossAttentionBlock(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, drop_path=0, iterative_shots=self.iterative_shots, no_exemplars=no_exemplars)
+            for i in range(decoder_depth)])      ### cross-attention blocks
 
         self.decoder_norm = norm_layer(decoder_embed_dim)
         self.window_size = window_size
         self.shift_size = tuple(i // 2 for i in self.window_size)
-        self.downsample = None
-
+        self.downsample = None 
         self.decode_heads = nn.ModuleList([
             WindowedSelfAttention(
                 dim=decoder_embed_dim,
                 num_heads=8,
                 window_size=self.window_size,
-                shift_size=(0, 0, 0) if (i % 2 == 0) else self.shift_size,
+                shift_size=(0,0,0) if (i % 2 == 0) else self.shift_size,
                 mlp_ratio=4,
                 qkv_bias=True,
                 norm_layer=norm_layer,
                 use_checkpoint=False,
             )
-            for i in range(3)])  ##### windowed self-attention blocks
+            for i in range(3)])       ##### windowed self-attention blocks
 
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.map = nn.Linear(decoder_embed_dim, 1, bias=True)
@@ -363,26 +365,26 @@ class SupervisedMAE(nn.Module):
     @torch.no_grad()
     def sincos_pos_embed(self, max_len=1000, embed_dim=768, n=10000):
         div_term = torch.exp(torch.arange(0, embed_dim, 2) * -(math.log(n) / embed_dim))
-        k = torch.arange(0, max_len).unsqueeze(1)
+        k = torch.arange(0, max_len).unsqueeze(1)     
         pe = torch.zeros(max_len, embed_dim)
         pe[:, 0::2] = torch.sin(k * div_term)
         pe[:, 1::2] = torch.cos(k * div_term)
-        pe = pe.unsqueeze(0)
+        pe = pe.unsqueeze(0) 
         return pe
-
+    
     @torch.no_grad()
-    def get_sinusoid_encoding_table(self, n_position, d_hid):
-        ''' Sinusoid position encoding table '''
-
+    def get_sinusoid_encoding_table(self, n_position, d_hid): 
+        ''' Sinusoid position encoding table ''' 
         # TODO: make it with torch instead of numpy 
-        def get_position_angle_vec(position):
-            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
+        def get_position_angle_vec(position): 
+            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)] 
 
-        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
-        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
-        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)]) 
+        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2]) # dim 2i 
+        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2]) # dim 2i+1 
 
-        return torch.tensor(sinusoid_table, dtype=torch.float, requires_grad=False).unsqueeze(0)
+        return  torch.tensor(sinusoid_table,dtype=torch.float, requires_grad=False).unsqueeze(0) 
+
 
     def initialize_weights(self):
         # initialization
@@ -420,8 +422,8 @@ class SupervisedMAE(nn.Module):
         x = self.norm(x)
 
         return x
-
-    def _mae_forward_encoder(self, x, ):
+    
+    def _mae_forward_encoder(self, x,):
         x, bcthw = self.patch_embed(x, keep_spatial=False)
         bcthw = list(bcthw)
         if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
@@ -433,6 +435,7 @@ class SupervisedMAE(nn.Module):
 
         if self.use_fixed_sincos_pos:
             x += self.pos_embed[:, s:, :]  # 0: no cls token
+
 
         if self.cls_embed_on:
             # append cls token
@@ -456,7 +459,6 @@ class SupervisedMAE(nn.Module):
                 x += self._get_pos_embed(pos_embed, bcthw)
             else:
                 x += self._get_pos_embed(self.pos_embed, bcthw)
-
         # apply Transformer blocks
         B, N, C = x.shape
         thw = [T, H, W]
@@ -467,11 +469,11 @@ class SupervisedMAE(nn.Module):
         return x, thw
 
     def forward(self, vid, yi=None, thw=None, boxes=None, shot_num=1):
-
+        
         y1 = []
 
         ### extract latent representations
-        if not self.use_precomputed:  # 训练的时候 use_precomputed 为 True，不走这个流程，可以忽略
+        if not self.use_precomputed:
             with torch.no_grad():
                 latent, thw = self._mae_forward_encoder(vid)  ##temporal dimension preserved 1568 tokens
                 latent = latent[:, 1:]
@@ -479,40 +481,45 @@ class SupervisedMAE(nn.Module):
                     return latent, torch.tensor(thw).to(latent.device)
         else:
             latent = vid
-
-        t, h, w = thw[0]
+        t,h,w = thw[0]
         x = self.decoder_embed(latent)
 
-        t = x.shape[1] // (h * w)
+        t = x.shape[1] // (h*w)
 
         ### temporal position embedding
         decoder_pos_embed_temporal = self.sincos_pos_embed(t, x.shape[2]).to(x.device)
         ### spatial position embedding  + temporal position embedding
-        pos_embed = self.decoder_spatial_pos_embed.repeat(1, t, 1) + torch.repeat_interleave(decoder_pos_embed_temporal, h * w, dim=1, )
-
+        pos_embed = self.decoder_spatial_pos_embed.repeat(
+                    1, t, 1
+                ) + torch.repeat_interleave(
+                    decoder_pos_embed_temporal,
+                    h*w,
+                    dim=1,
+                )
+        
         x = x + pos_embed
-
+ 
         if shot_num > 0:
             yi = self.decoder_embed(yi)
-            N, _, C = yi.shape
-
-            y = yi
+            N,_,C = yi.shape
+            
+            y = yi 
 
         else:  ### use 0-shot token if shot_num>0
-            y = self.shot_token.unsqueeze(0).repeat(x.shape[0], 1, 1).to(x.device)  ## zero-shot token repeat
+            
+            y = self.shot_token.unsqueeze(0).repeat(x.shape[0],1, 1).to(x.device)  ## zero-shot token repeat
 
         for blk in self.decoder_blocks:  ### cross-attention blocks
-            x = blk(x, y, shot_num=max(shot_num, 1))
-
+            x = blk(x, y, shot_num=max(shot_num,1))  
         x = self.decoder_norm(x)
 
         n, thw, c = x.shape
 
-        t = int(thw / (h * w))
-        x = x.reshape(n, t, h, w, c)
+        t = int(thw / (h*w))
+        x = x.reshape(n,t,h,w,c)
         B, D, H, W, C = x.shape
-        window_size, shift_size = get_window_size((D, H, W), self.window_size, self.shift_size)
-
+        window_size, shift_size = get_window_size((D,H,W), self.window_size, self.shift_size)
+        
         Dp = int(np.ceil(D / window_size[0])) * window_size[0]
         Hp = int(np.ceil(H / window_size[1])) * window_size[1]
         Wp = int(np.ceil(W / window_size[2])) * window_size[2]
@@ -523,7 +530,7 @@ class SupervisedMAE(nn.Module):
             x = decode_head(x, attn_mask)
         if self.downsample is not None:
             x = self.downsample(x)
-        x = self.map(x)  ### linear mapping
+        x = self.map(x)    ### linear mapping
         x = einops.rearrange(x, 'b d h w c -> b c d h w')
 
         x = x.squeeze(1).reshape(-1, t, h, w)
